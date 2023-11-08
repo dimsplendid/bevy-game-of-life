@@ -1,15 +1,15 @@
 use bevy::prelude::*;
 use rand::random;
 
+use itertools::iproduct;
 use std::collections::HashSet;
 use std::time::Duration;
-use itertools::iproduct;
 
 const SIZE: f32 = 10.0;
 const GAP: f32 = 4.0;
 const HALF_LEN: i32 = 40;
 const INIT_ALIVE_COUNT: usize = (HALF_LEN * HALF_LEN) as usize;
-const TICK: Duration = Duration::from_millis(10);
+const TICK: Duration = Duration::from_millis(50);
 
 type Coord = (i32, i32);
 
@@ -32,17 +32,13 @@ struct Dashboard {
 }
 
 fn seed() -> HashSet<Coord> {
-    let mut result = HashSet::new();
-
-    loop {
-        // not on edge
-        let x = random::<i32>() % HALF_LEN;
-        let y = random::<i32>() % HALF_LEN;
-        result.insert((x, y));
-        if result.len() == INIT_ALIVE_COUNT {
-            return result;
-        }
-    }
+    let mut coords = HashSet::new();
+    (0..)
+        .map(|_| (random::<i32>() % HALF_LEN, random::<i32>() % HALF_LEN))
+        .filter(|&new_coord| coords.insert(new_coord))
+        .take(INIT_ALIVE_COUNT)
+        .for_each(drop);
+    coords
 }
 
 fn setup(mut commands: Commands) {
@@ -61,7 +57,7 @@ fn setup(mut commands: Commands) {
             };
             let pos = Vec3::new(x as f32 * (SIZE + GAP), y as f32 * (SIZE + GAP), 0.0);
             (
-                cell, 
+                cell,
                 SpriteBundle {
                     sprite: Sprite {
                         custom_size: Some(Vec2 { x: SIZE, y: SIZE }),
@@ -69,11 +65,10 @@ fn setup(mut commands: Commands) {
                     },
                     transform: Transform::from_translation(pos),
                     ..Default::default()
-                }
+                },
             )
         })
         .collect::<Vec<_>>();
-
 
     commands.spawn_batch(cells);
     // dashboard
@@ -164,12 +159,12 @@ fn test_alive_neighbor() {
 }
 
 fn update_cell_color(mut query: Query<(&mut Sprite, &Cell)>) {
-    query.par_iter_mut().for_each(|(mut sprite, cell)| {
-        match cell.state {
+    query
+        .par_iter_mut()
+        .for_each(|(mut sprite, cell)| match cell.state {
             State::Dead => sprite.color = Color::GRAY,
             State::Alive => sprite.color = Color::WHITE,
-        }
-    });
+        });
 }
 
 fn update_dashboard(db: Res<Dashboard>, mut query: Query<&mut Text>) {
